@@ -304,7 +304,7 @@
         // --- 필터링 처리 ---
         function setFilter(filterVal) {
             currentFilter = filterVal;
-            ['all', '승찬', '준서'].forEach(val => {
+            ['all', '승찬', '준서', '승찬&준서'].forEach(val => {
                 const btn = document.getElementById(`btn-filter-${val}`);
                 if(!btn) return;
                 if (val === filterVal) {
