@@ -17,23 +17,23 @@
     <style>
         body { background-color: #f8fafc; }
         
-        /* 커스텀 스크롤바 */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
-        /* 핵심 그리드 레이아웃: 요일 헤더와 본문을 정확히 일치시킴 */
+        /* 핵심 그리드 레이아웃: 토요일 추가로 인해 repeat(6)으로 변경 */
         .time-grid { 
             display: grid; 
-            grid-template-columns: 60px repeat(5, minmax(0, 1fr)); 
+            grid-template-columns: 60px repeat(6, minmax(0, 1fr)); 
         }
         
-        /* 30분 단위 백그라운드 셀 및 선 스타일 (칸의 위쪽에 선을 그어 오차 방지) */
-        .slot-top { border-top: 1px solid #cbd5e1; height: 36px; box-sizing: border-box; } /* 정시 실선 */
-        .slot-bottom { border-top: 1px dashed #cbd5e1; height: 36px; box-sizing: border-box; } /* 30분 점선 */
+        .slot-top { border-top: 1px solid #cbd5e1; height: 36px; box-sizing: border-box; }
+        .slot-bottom { border-top: 1px dashed #cbd5e1; height: 36px; box-sizing: border-box; }
         
-        /* 일정 카드 스타일 (글자색 #333 고정, 모서리 3px, 정중앙 정렬) */
+        /* 드래그 중일 때, 배경의 빈칸(슬롯)이 마우스 이벤트를 받을 수 있도록 카드의 클릭 방지 */
+        body.dragging-active .event-card { pointer-events: none; }
+        
         .event-card {
             position: absolute;
             border-radius: 3px;
@@ -45,11 +45,13 @@
             text-align: center;
             border: 1px solid rgba(0,0,0,0.05);
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-            transition: transform 0.1s ease, z-index 0.1s;
+            transition: transform 0.1s ease, z-index 0.1s, opacity 0.2s;
             overflow: hidden;
-            cursor: pointer;
+            cursor: grab;
             line-height: 1.2;
+            user-select: none;
         }
+        .event-card:active { cursor: grabbing; }
         .event-card:hover {
             z-index: 30 !important;
             transform: scale(1.02);
@@ -80,16 +82,17 @@
 
     <!-- 메인 시간표 영역 -->
     <main class="flex-1 overflow-y-auto overflow-x-auto bg-white relative">
-        <div class="min-w-[700px] flex flex-col relative h-full">
+        <div class="min-w-[800px] flex flex-col relative h-full">
             
-            <!-- Sticky 요일 헤더 (본문과 완벽히 동일한 Grid 구조) -->
+            <!-- Sticky 요일 헤더 -->
             <div class="time-grid sticky top-0 z-20 bg-slate-50 border-b border-slate-300 shadow-sm" id="grid-header">
                 <div class="border-r border-slate-200"></div>
                 <div class="text-center py-2 text-sm font-bold border-r border-slate-200 text-slate-700">월</div>
                 <div class="text-center py-2 text-sm font-bold border-r border-slate-200 text-slate-700">화</div>
                 <div class="text-center py-2 text-sm font-bold border-r border-slate-200 text-slate-700">수</div>
                 <div class="text-center py-2 text-sm font-bold border-r border-slate-200 text-slate-700">목</div>
-                <div class="text-center py-2 text-sm font-bold text-slate-700">금</div>
+                <div class="text-center py-2 text-sm font-bold border-r border-slate-200 text-slate-700">금</div>
+                <div class="text-center py-2 text-sm font-bold text-slate-700">토</div> <!-- 토요일 추가 -->
             </div>
             
             <!-- 그리드 바디 -->
@@ -99,17 +102,16 @@
         </div>
     </main>
 
+    <!-- 알림창 등 모달 리소스 생략 (기존과 동일) -->
     <!-- 커스텀 알림/확인 모달 -->
     <div id="custom-alert" class="fixed inset-0 bg-slate-900/50 hidden z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-xs overflow-hidden text-center p-5">
             <p id="alert-message" class="text-slate-800 font-medium mb-5 whitespace-pre-line"></p>
-            <div class="flex gap-2 justify-center" id="alert-buttons">
-                <!-- 버튼이 동적으로 들어갑니다 -->
-            </div>
+            <div class="flex gap-2 justify-center" id="alert-buttons"></div>
         </div>
     </div>
 
-    <!-- 모달 (일정 추가/수정) -->
+    <!-- 일정 추가/수정 모달 -->
     <div id="event-modal" class="fixed inset-0 bg-slate-900/40 hidden z-50 flex items-center justify-center p-4 backdrop-blur-sm">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-sm flex flex-col overflow-hidden max-h-[90vh]">
             <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
@@ -119,7 +121,6 @@
             
             <div class="p-5 flex-1 overflow-y-auto space-y-4">
                 <input type="hidden" id="modal-id">
-                
                 <div class="space-y-3">
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1">일정 제목</label>
@@ -145,6 +146,7 @@
                             <option value="수">수요일</option>
                             <option value="목">목요일</option>
                             <option value="금">금요일</option>
+                            <option value="토">토요일</option> <!-- 토요일 추가 -->
                         </select>
                     </div>
                     <div>
@@ -196,50 +198,38 @@
     </div>
 
     <script>
-        // --- 1. Supabase 연동 설정 ---
-        // (변수명을 supabaseClient로 수정하여 충돌 방지)
         const SUPABASE_URL = 'https://oynavzcxlyntkpvsytrb.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_qqu6ruXnxHlaL3EUnSbs6g_cOwHomhK';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // --- 상수 및 변수 ---
         const START_HOUR = 10;
         const END_HOUR = 21;
-        const DAYS = ['월', '화', '수', '목', '금'];
+        const DAYS = ['월', '화', '수', '목', '금', '토']; // 토요일 추가
         
-        // 프리셋 색상들
         const PRESET_COLORS = ['#dcefe7', '#d7e3cc', '#d4e6f1', '#d6eaf8', '#e8daef', '#fadbd8', '#fdebd0', '#fcf3cf', '#ebedef', '#f5cba7'];
         
         let events = [];
         let currentFilter = 'all';
         let selectedColor = PRESET_COLORS[0];
 
-        // 커스텀 알림창 함수 (alert 대체)
+        // 모달창 헬퍼
         function showAlert(message) {
             document.getElementById('alert-message').innerText = message;
             document.getElementById('alert-buttons').innerHTML = `<button onclick="closeAlert()" class="px-6 py-2 bg-slate-800 text-white rounded-[3px] text-sm font-bold">확인</button>`;
             document.getElementById('custom-alert').classList.remove('hidden');
         }
 
-        // 커스텀 확인창 함수 (confirm 대체)
         function showConfirm(message, onConfirm) {
             document.getElementById('alert-message').innerText = message;
             document.getElementById('alert-buttons').innerHTML = `
                 <button onclick="closeAlert()" class="px-4 py-2 bg-slate-200 text-slate-800 rounded-[3px] text-sm font-bold">취소</button>
                 <button id="btn-confirm-yes" class="px-4 py-2 bg-red-500 text-white rounded-[3px] text-sm font-bold">삭제하기</button>
             `;
-            document.getElementById('btn-confirm-yes').onclick = () => {
-                closeAlert();
-                onConfirm();
-            };
+            document.getElementById('btn-confirm-yes').onclick = () => { closeAlert(); onConfirm(); };
             document.getElementById('custom-alert').classList.remove('hidden');
         }
+        function closeAlert() { document.getElementById('custom-alert').classList.add('hidden'); }
 
-        function closeAlert() {
-            document.getElementById('custom-alert').classList.add('hidden');
-        }
-
-        // --- 초기화 함수 ---
         async function init() {
             buildGridBase();
             buildTimeOptions();
@@ -248,14 +238,11 @@
             setupRealtime();
         }
 
-        // --- 레이아웃 생성 ---
         function buildGridBase() {
             const body = document.getElementById('grid-body');
             
-            // 1. 시간 라벨 컬럼 생성
             let timeHtml = `<div class="border-r border-slate-200 relative bg-white" style="height: ${(END_HOUR - START_HOUR) * 72}px">`;
             for (let h = START_HOUR; h <= END_HOUR; h++) {
-                // 10시 라벨은 짤리므로 생략
                 if (h !== START_HOUR) { 
                     const topPx = (h - START_HOUR) * 72;
                     timeHtml += `<span class="absolute right-2 text-xs font-semibold text-slate-400 bg-white px-1 z-10" style="top: ${topPx - 8}px">${h}:00</span>`;
@@ -263,16 +250,19 @@
             }
             timeHtml += `</div>`;
 
-            // 2. 요일별 컬럼 생성 (클릭 감지를 위한 슬롯 포함)
             let colsHtml = '';
             DAYS.forEach(day => {
                 colsHtml += `<div class="relative border-r border-slate-200 last:border-r-0 bg-white" id="col-${day}">`;
-                
                 for (let h = START_HOUR; h < END_HOUR; h++) {
-                    // 정시(00분) 슬롯 - 상단 실선
-                    colsHtml += `<div class="slot-top hover:bg-slate-50 transition-colors cursor-pointer w-full" onclick="openModalForSlot('${day}', '${h}:00')"></div>`;
-                    // 반시(30분) 슬롯 - 상단 점선
-                    colsHtml += `<div class="slot-bottom hover:bg-slate-50 transition-colors cursor-pointer w-full" onclick="openModalForSlot('${day}', '${h}:30')"></div>`;
+                    // 드래그 앤 드롭 이벤트를 받을 수 있도록 ondragover, ondrop 추가
+                    colsHtml += `<div class="slot-top hover:bg-slate-50 transition-colors cursor-pointer w-full" 
+                                      onclick="openModalForSlot('${day}', '${h}:00')"
+                                      ondragover="event.preventDefault()"
+                                      ondrop="handleDrop(event, '${day}', '${h}:00')"></div>`;
+                    colsHtml += `<div class="slot-bottom hover:bg-slate-50 transition-colors cursor-pointer w-full" 
+                                      onclick="openModalForSlot('${day}', '${h}:30')"
+                                      ondragover="event.preventDefault()"
+                                      ondrop="handleDrop(event, '${day}', '${h}:30')"></div>`;
                 }
                 colsHtml += `</div>`;
             });
@@ -301,50 +291,64 @@
             `).join('');
         }
 
-        // --- 필터링 처리 ---
         function setFilter(filterVal) {
             currentFilter = filterVal;
             ['all', '승찬', '준서', '승찬&준서'].forEach(val => {
                 const btn = document.getElementById(`btn-filter-${val}`);
                 if(!btn) return;
-                if (val === filterVal) {
-                    btn.className = "px-4 py-1.5 rounded-[3px] text-sm font-semibold transition-colors bg-slate-800 text-white";
-                } else {
-                    btn.className = "px-4 py-1.5 rounded-[3px] text-sm font-semibold transition-colors bg-slate-100 text-slate-600 hover:bg-slate-200";
-                }
+                btn.className = (val === filterVal) 
+                    ? "px-4 py-1.5 rounded-[3px] text-sm font-semibold transition-colors bg-slate-800 text-white" 
+                    : "px-4 py-1.5 rounded-[3px] text-sm font-semibold transition-colors bg-slate-100 text-slate-600 hover:bg-slate-200";
             });
             renderEvents();
         }
 
-        // --- 데이터 Fetch 및 Realtime ---
         async function fetchEvents() {
             const { data, error } = await supabaseClient.from('schedules').select('*');
-            if (error) {
-                console.error(error);
-                showAlert('데이터를 불러오지 못했습니다.\n네트워크 상태나 설정을 확인해주세요.');
-                return;
+            if (!error && data) {
+                events = data;
+                renderEvents();
             }
-            events = data || [];
-            renderEvents();
         }
 
         function setupRealtime() {
             supabaseClient.channel('public:schedules')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, payload => {
                     fetchEvents(); 
-                })
-                .subscribe();
+                }).subscribe();
         }
 
-        // --- 카드 렌더링 및 겹침(Side-by-side) 로직 ---
         function timeToMinutes(timeStr) {
             if(!timeStr) return 0;
             const [h, m] = timeStr.split(':').map(Number);
             return h * 60 + m;
         }
 
+        // 겹치는 일정들을 그룹(클러스터)으로 묶어주는 개선된 알고리즘
+        function getEventClusters(dayEvents) {
+            if (dayEvents.length === 0) return [];
+            let clusters = [];
+            let currentCluster = [dayEvents[0]];
+            let clusterEnd = timeToMinutes(dayEvents[0].end_time);
+
+            for (let i = 1; i < dayEvents.length; i++) {
+                const ev = dayEvents[i];
+                const evStart = timeToMinutes(ev.start_time);
+                
+                if (evStart < clusterEnd) { // 현재 클러스터와 겹침
+                    currentCluster.push(ev);
+                    clusterEnd = Math.max(clusterEnd, timeToMinutes(ev.end_time));
+                } else { // 겹치지 않음 -> 새로운 클러스터 시작
+                    clusters.push(currentCluster);
+                    currentCluster = [ev];
+                    clusterEnd = timeToMinutes(ev.end_time);
+                }
+            }
+            clusters.push(currentCluster);
+            return clusters;
+        }
+
         function renderEvents() {
-            // 기존 카드 지우기
             DAYS.forEach(day => {
                 const col = document.getElementById(`col-${day}`);
                 if (col) {
@@ -353,36 +357,40 @@
                 }
             });
 
-            // 필터링 적용
             const displayEvents = currentFilter === 'all' 
                 ? events 
                 : events.filter(e => e.person_name === currentFilter);
 
-            // 요일별 렌더링
             DAYS.forEach(day => {
                 const dayEvents = displayEvents
                     .filter(e => e.day_of_week === day)
                     .sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time));
                 
-                // 겹침 계산 (Greedy 방식)
-                let columns = [];
-                dayEvents.forEach(ev => {
-                    let placed = false;
-                    for (let i = 0; i < columns.length; i++) {
-                        const lastEventInCol = columns[i][columns[i].length - 1];
-                        if (timeToMinutes(lastEventInCol.end_time) <= timeToMinutes(ev.start_time)) {
-                            columns[i].push(ev);
-                            ev._col = i;
-                            placed = true;
-                            break;
+                const clusters = getEventClusters(dayEvents);
+
+                // 각 클러스터(겹치는 묶음) 별로 컬럼 위치 계산
+                clusters.forEach(cluster => {
+                    let columns = [];
+                    cluster.forEach(ev => {
+                        let placed = false;
+                        for (let i = 0; i < columns.length; i++) {
+                            const lastEventInCol = columns[i][columns[i].length - 1];
+                            if (timeToMinutes(lastEventInCol.end_time) <= timeToMinutes(ev.start_time)) {
+                                columns[i].push(ev);
+                                ev._col = i;
+                                placed = true;
+                                break;
+                            }
                         }
-                    }
-                    if (!placed) {
-                        columns.push([ev]);
-                        ev._col = columns.length - 1;
-                    }
+                        if (!placed) {
+                            columns.push([ev]);
+                            ev._col = columns.length - 1;
+                        }
+                    });
+                    
+                    // 해당 클러스터에 속한 이벤트들은 최대 분할 수(columns.length)를 공유함 (안 겹치면 100% 너비)
+                    cluster.forEach(ev => ev._totalCols = columns.length);
                 });
-                dayEvents.forEach(ev => ev._totalCols = columns.length);
 
                 const colEl = document.getElementById(`col-${day}`);
                 if (!colEl) return;
@@ -392,16 +400,13 @@
                     const endMins = Math.min(END_HOUR * 60, timeToMinutes(ev.end_time));
                     if(startMins >= endMins) return;
 
-                    // 1시간 = 60분 = 72px -> 1분 = 1.2px
                     const topPx = (startMins - START_HOUR * 60) * 1.2;
                     const heightPx = (endMins - startMins) * 1.2;
                     
-                    // 너비 및 좌측 여백 설정 (전체 96%를 사용, 양옆 2% 여백)
                     const baseWidthPct = 96 / ev._totalCols;
                     const leftPct = 2 + (baseWidthPct * ev._col);
                     const isShort = heightPx <= 40;
 
-                    // 폰트 설정 불러오기 (없으면 기본값)
                     const fSize = ev.font_size || 14;
                     const fFam = ev.font_family || "'Inter', 'Noto Sans KR', sans-serif";
                     const fWeight = ev.font_weight || "normal";
@@ -414,16 +419,24 @@
                     card.style.width = `${baseWidthPct}%`;
                     card.style.backgroundColor = ev.color || PRESET_COLORS[0];
                     card.style.zIndex = "10";
-                    
-                    // 글꼴 통합 적용
                     card.style.fontFamily = fFam;
                     card.style.fontWeight = fWeight;
 
+                    // 드래그 앤 드롭 이벤트 부여
+                    card.draggable = true;
+                    card.ondragstart = (e) => {
+                        e.dataTransfer.setData('eventId', ev.id);
+                        setTimeout(() => card.classList.add('opacity-50'), 0); // 드래그 중인 카드 반투명
+                        document.body.classList.add('dragging-active'); // 슬롯 활성화를 위한 body 클래스 추가
+                    };
+                    card.ondragend = (e) => {
+                        card.classList.remove('opacity-50');
+                        document.body.classList.remove('dragging-active');
+                    };
+
                     card.onclick = (e) => { e.stopPropagation(); openModal(ev); };
 
-                    // 카드 텍스트 표시 (시간과 이름은 메인 폰트보다 약간 작게 비율 유지)
                     const subSize = Math.max(10, fSize - 2); 
-
                     card.innerHTML = `
                         <div class="w-full truncate px-1 drop-shadow-sm" style="font-size: ${fSize}px;">${ev.title}</div>
                         ${!isShort ? `<div class="mt-0.5 w-full leading-none opacity-80" style="font-size: ${subSize}px;">${ev.start_time} - ${ev.end_time}</div>` : ''}
@@ -435,7 +448,49 @@
             });
         }
 
-        // --- 모달 제어 ---
+        // 드래그 앤 드롭 놓기 처리 로직
+        window.handleDrop = async function(e, day, newStartTime) {
+            e.preventDefault();
+            const eventId = e.dataTransfer.getData('eventId');
+            if (!eventId) return;
+
+            const ev = events.find(x => x.id == eventId);
+            if (!ev) return;
+
+            // 기존 일정의 소요 시간(분) 계산
+            const startMins = timeToMinutes(ev.start_time);
+            const endMins = timeToMinutes(ev.end_time);
+            const duration = endMins - startMins;
+
+            // 새 위치의 시작 시간에 맞춰 종료 시간 계산
+            let newStartMins = timeToMinutes(newStartTime);
+            let newEndMins = newStartMins + duration;
+            if (newEndMins > END_HOUR * 60) newEndMins = END_HOUR * 60; // 자정(21:00)을 넘지 않도록 제한
+
+            let [sh, sm] = [Math.floor(newStartMins / 60), newStartMins % 60];
+            let [eh, em] = [Math.floor(newEndMins / 60), newEndMins % 60];
+
+            const newStartStr = `${sh.toString().padStart(2,'0')}:${sm.toString().padStart(2,'0')}`;
+            const newEndStr = `${eh.toString().padStart(2,'0')}:${em.toString().padStart(2,'0')}`;
+
+            // 화면을 즉시 업데이트(반응성)한 뒤 DB 저장
+            ev.day_of_week = day;
+            ev.start_time = newStartStr;
+            ev.end_time = newEndStr;
+            renderEvents();
+
+            const { error } = await supabaseClient.from('schedules').update({
+                day_of_week: day,
+                start_time: newStartStr,
+                end_time: newEndStr
+            }).eq('id', eventId);
+
+            if (error) {
+                showAlert('일정 이동에 실패했습니다.\n' + error.message);
+                fetchEvents(); // 실패 시 원래 데이터로 복구
+            }
+        };
+
         function selectColor(hex) {
             selectedColor = hex;
             PRESET_COLORS.forEach((c, i) => {
@@ -489,9 +544,7 @@
             document.getElementById('event-modal').classList.remove('hidden');
         }
 
-        function closeModal() {
-            document.getElementById('event-modal').classList.add('hidden');
-        }
+        function closeModal() { document.getElementById('event-modal').classList.add('hidden'); }
 
         function validateTime() {
             const start = document.getElementById('modal-start').value;
@@ -504,7 +557,6 @@
             }
         }
 
-        // --- Supabase DB 저장/삭제 ---
         async function saveEvent() {
             const id = document.getElementById('modal-id').value;
             const title = document.getElementById('modal-title-input').value.trim();
@@ -535,12 +587,8 @@
                 error = res.error;
             }
 
-            if (error) {
-                showAlert('저장에 실패했습니다.\n' + error.message);
-            } else {
-                closeModal();
-                fetchEvents(); 
-            }
+            if (error) showAlert('저장에 실패했습니다.\n' + error.message);
+            else { closeModal(); fetchEvents(); }
         }
 
         function handleDelete() {
@@ -549,18 +597,12 @@
                 if (!id) return;
                 
                 const { error } = await supabaseClient.from('schedules').delete().eq('id', id);
-                if (error) {
-                    showAlert('삭제 실패: ' + error.message);
-                } else {
-                    closeModal();
-                    fetchEvents();
-                }
+                if (error) showAlert('삭제 실패: ' + error.message);
+                else { closeModal(); fetchEvents(); }
             });
         }
 
-        // --- 시작 ---
         window.onload = init;
-
     </script>
 </body>
 </html>
