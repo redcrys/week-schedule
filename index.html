@@ -358,8 +358,15 @@
             });
 
             const displayEvents = currentFilter === 'all' 
-                ? events 
-                : events.filter(e => e.person_name === currentFilter);
+    ? events 
+    : events.filter(e => {
+        // 승찬이나 준서 탭을 눌렀을 때, 본인 일정과 '승찬&준서' 일정을 모두 포함해서 보여줌
+        if (currentFilter === '승찬' || currentFilter === '준서') {
+            return e.person_name === currentFilter || e.person_name === '승찬&준서' || e.person_name === '가족공통';
+        }
+        // 그 외의 탭(승찬&준서 등)을 눌렀을 때는 해당 항목만 정확히 보여줌
+        return e.person_name === currentFilter;
+    });
 
             DAYS.forEach(day => {
                 const dayEvents = displayEvents
